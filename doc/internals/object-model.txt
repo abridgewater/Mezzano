@@ -58,9 +58,9 @@ remove with offset memory addressing instructions).
 
 ** The CHARACTER type
 
-A CHARACTER is comprised of an (unsigned-byte 21) code-point
-(presumably unicode) in bits 4 through 56 and an (unsigned-byte 7) set
-of additional attributes in bits 57 through 63.
+A CHARACTER is comprised of an (unsigned-byte 21) unicode code-point
+in bits 4 through 24 and an (unsigned-byte 7) set of additional
+attributes in bits 25 through 31.
 
 ** The SINGLE-FLOAT type
 
