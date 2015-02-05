@@ -1,0 +1,133 @@
+The Representation of the Lisp Object Model
+
+
+* Boxed Words
+
+Boxed words are pointer and immediate values that represent Lisp
+objects with type information.  Lisp code and the garbage collector
+can look at a boxed word and know if it is a pointer or immediate
+value, and what kind of value it is.
+
+The one or four lowest bits of a boxed word contain a "tag"
+representing type information about the word.  The only cleverness
+about the allocation of type tags appears to be that FIXNUMs have a
+single tag bit which must be zero, allowing the largest range of
+FIXNUMs for a 64-bit platform and the least difficulty in operating
+with them.  There does not appear to be a specific cleverness for
+distinguishing pointer-tagged words from immediate-tagged words other
+than by comparing the extracted tag to each pointer tag value in turn.
+
++------+-----------------------+
+| bits |                       |
+| 3210 |       data type       |
++------+-----------------------+
+| xxx0 | FIXNUM                |
+| 0001 | unused                |
+| 0011 | pointer to CONS cell  |
+| 0101 | unused                |
+| 0111 | unused                |
+| 1001 | pointer to object     |
+| 1011 | CHARACTER             |
+| 1101 | SINGLE-FLOAT          |
+| 1111 | GC forwarding pointer |
++------+-----------------------+
+
+Pointer objects also have an "address tag" and a "mark bit", the mark
+bit being bit 44 and having something to do with the garbage collector
+while the address tag being bits 45 through 48 and being used to
+define areas of paged memory with various attributes.
+
+** The FIXNUM type
+
+A FIXNUM is a (SIGNED-BYTE 63) stored in the highest 63 bits of a
+word.  The tag bit is zero, allowing addition and subtraction with no
+adjustments, and division and multiplication with simple shifts to
+compensate for the type tag.
+
+** The pointer to CONS cell type
+
+A pointer to CONS cell contains the address of a two-word structure in
+memory containing the CAR and CDR of the CONS, biased by the tag value
+itself (easy to remove with offset memory addressing instructions).
+
+** The pointer to object type
+
+A pointer to object contains the address of the header word of some
+object structure in memory, biased by the tag value itself (easy to
+remove with offset memory addressing instructions).
+
+** The CHARACTER type
+
+A CHARACTER is comprised of an (unsigned-byte 21) code-point
+(presumably unicode) in bits 4 through 56 and an (unsigned-byte 7) set
+of additional attributes in bits 57 through 63.
+
+** The SINGLE-FLOAT type
+
+A SINGLE-FLOAT is comprised of a 32-bit SINGLE-FLOAT value in the
+highest 32 bits of the word.
+
+** The GC forwarding pointer type
+
+This type tag should never be seen during normal operation, it is
+specific to the garbage collector.
+
+
+* Objects in Memory
+
+There are two types of memory area in the system.  One is a "cons"
+area, which can only store cons cells.  The other is a more general
+object region which stores objects with headers (including cons cells,
+though these take up twice as much space as they do in a cons region,
+due to the additional header).
+
+Within a cons region, each consecutive pair of words in memory is a
+cons cell, the first being the CAR and the second being the CDR.
+
+Within a general object region, storage for each object begins with a
+header which provides type information for both the lisp object model
+and the garbage collector.
+
+An object header is a FIXNUM containing a mark bit for use by the
+garbage collector, six bits of "array" type tag, and 56 "length" bits.
+
++--------+------+------+---+
+| 6      |      |      |   |
+| 3    8 | 7  2 |   1  | 0 |
++--------+------+------+---+
+| length | type | mark | 0 |
++--------+------+------+---+
+
+The type tag is six bits wide, providing 64 tag values of which 53
+have been allocated and 11 remain unused.
+
+Tags 0-24 and 27-31 are various arrays (30 tags total).
+Tags 25-26 are unused (2 tags total).
+Tags 32-41 are numbers (10 tags, for 40 total).
+Tags 42-47 are unused (6 tags, for 8 total).
+Tags 48-57 are miscellaneous objects (10 tags, for 50 total).
+Tags 58-59 are unused (2 tags, for 10 total).
+Tags 60-62 are funcallable objects (3 tags, for 53 total).
+Tag 63 is unused (1 tag, for 11 total).
+
+FIXME: Fill out specific details for each object type.
+
+
+* The story of NIL
+
+Common Lisp defines NIL to be a SYMBOL, but also to be of type LIST,
+and that CAR and CDR of NIL return NIL.  Every implementation must
+come to terms with this in their own way.
+
+Mezzano effectively defines type LIST to be (SATISFIES LISTP), and
+LISTP (OBJECT) to be (OR (NULL OBJECT) (CONSP OBJECT)).  The
+implementation of CAR and CDR then check to see if their input is NIL,
+and if so they exit early instead of trying to load the CAR or CDR
+slot of their argument.
+
+Other implementation choices can speed up CAR, CDR, and LISTP at the
+expense of slower operations involving SYMBOLs and a more careful
+arrangement of boxed word tag values.
+
+
+EOF
